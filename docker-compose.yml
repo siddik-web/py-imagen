@@ -1,11 +1,14 @@
-version: '3.8'
-
 services:
   local-ai-studio:
     build: .
     container_name: ai_automation_studio
     ports:
       - "7860:7860"
+    environment:
+      # FLUX.1-schnell is gated on Hugging Face, so the container needs a token.
+      - HF_TOKEN=${HF_TOKEN:-}
+      - HUGGINGFACE_HUB_TOKEN=${HUGGINGFACE_HUB_TOKEN:-}
+      - FLUX_MODEL_ID=${FLUX_MODEL_ID:-black-forest-labs/FLUX.1-schnell}
     volumes:
       - .:/app
       # Cache Hugging Face models on your host machine so they don't re-download if the container resets

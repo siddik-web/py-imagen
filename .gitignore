@@ -1,0 +1,7 @@
+.env
+token.json
+credentials.json
+local_upload_target.png
+outputs/
+__pycache__/
+*.py[cod]

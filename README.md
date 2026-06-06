@@ -1,89 +1,261 @@
-# 🤖 Local VRAM Social Content Studio
+# Local VRAM Social Content Studio
 
-An automated, self-hosted pipeline that takes text blueprints, generates high-fidelity images completely locally using an open-source AI engine, stamps programmatic UI text overlays, and seamlessly handles scheduling workflows to Google Drive and Meta (Facebook/Instagram).
+An automated, self-hosted pipeline that takes text blueprints, generates images locally with FLUX.1-schnell, stamps clean text overlays with Pillow, and prepares scheduling workflows for Google Drive and Meta.
 
----
+## Key Features
 
-## ⚡ Key Features
+- **Local image generation**: Runs FLUX.1-schnell on your own NVIDIA GPU.
+- **16GB VRAM friendly**: Uses Diffusers CPU offload for a 16GB GPU / 32GB RAM setup.
+- **Programmatic text overlays**: Uses Pillow for crisp text boxes and button-style overlays.
+- **Gradio interface**: Provides a local browser UI at `http://localhost:7860`.
+- **Local-first output**: Saves every generated image to your local drive before any upload or posting step.
+- **Optional scheduling pipeline**: Lets you choose whether to upload generated images to Google Drive and whether to send scheduling requests to Meta.
 
-* **100% Free Image Generation:** Powered by **FLUX.1-schnell** running completely locally on your hardware (Zero API generation costs).
-* **VRAM Optimization:** Configured natively for a 16GB GPU / 32GB System RAM setup using intelligent CPU offloading to prevent Out-Of-Memory (OOM) crashes.
-* **Programmatic UI Stamping:** Bypasses AI text rendering limitations by using Pillow to cleanly overlay crisp text rectangles and multiple choice quiz buttons.
-* **Automated Scheduling:** Uploads final outputs directly to Google Drive and interfaces with the Meta Graph API to queue up scheduled posts.
-* **Interactive Control Board:** Features a built-in Gradio web application for ad-hoc manual prompt creation, live canvas previewing, and scheduling controls.
+## Recommended Local PC Specs
 
----
-
-## 🖥️ System Requirements & Architecture
-
-| Component | Minimum Recommended Specs |
+| Component | Recommended |
 | :--- | :--- |
-| **GPU VRAM** | 16 GB (NVIDIA card with CUDA capability) |
-| **System RAM** | 32 GB (Required for model layer offloading) |
-| **Storage Space** | ~30 GB free space (to store local AI weights and runtime caches) |
-| :--- | :--- |
+| GPU | NVIDIA GPU with 16GB VRAM |
+| System RAM | 32GB |
+| Storage | At least 30GB free for model files and Docker layers |
+| OS | Windows with Docker Desktop and WSL2 backend |
 
----
+## Step-by-Step Local Setup
 
-## 🐳 Docker Setup
+### 1. Install Required Software
 
-### Prerequisites
-- **NVIDIA GPU** with CUDA 12.1+ support
-- **Docker Engine** installed
-- **NVIDIA Container Toolkit** (`nvidia-docker2`) installed for GPU passthrough
+Install these first:
 
-### Quick Start with Docker Compose
+- [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/)
+- Latest NVIDIA GPU driver
+- NVIDIA Container Toolkit support through Docker Desktop / WSL2
 
-```bash
-# Build and start the container with GPU access
-docker-compose up --build -d
+After installing Docker Desktop, open PowerShell in this project folder:
 
-# View logs
-docker-compose logs -f
-
-# Stop the container
-docker-compose down
+```powershell
+cd D:\Projects\py-imagen
 ```
 
-The service will be available at **http://localhost:7860**
+Check Docker:
 
-### Docker Compose Configuration Details
-
-The `docker-compose.yml` handles:
-- **GPU Passthrough**: Automatic NVIDIA GPU reservation for CUDA acceleration
-- **Model Caching**: Mounts `~/.cache/huggingface` from host to persist FLUX model weights (~24GB)
-- **Live Reload**: Source code mounted for development iteration
-- **Auto-restart**: Container restarts unless explicitly stopped
-
-### Manual Docker Build & Run
-
-```bash
-# Build the image
-docker build -t local-ai-studio .
-
-# Run with GPU access
-docker run -d \
-  --name ai_automation_studio \
-  --gpus all \
-  -p 7860:7860 \
-  -v $(pwd):/app \
-  -v ~/.cache/huggingface:/root/.cache/huggingface \
-  --restart unless-stopped \
-  local-ai-studio
+```powershell
+docker --version
+docker compose version
 ```
 
-### Important Notes
-- **First run** downloads ~24GB FLUX.1-schnell model weights (cached for future runs)
-- **Google Drive Auth**: Requires `credentials.json` in project root for OAuth flow
-- **Meta API**: Update `META_ACCESS_TOKEN` and `FACEBOOK_PAGE_ID` in `app.py` before deployment
+Check that Windows can see your GPU:
 
----
+```powershell
+nvidia-smi
+```
 
-## 📂 Project Structure
+You should see your NVIDIA GPU and available VRAM.
+
+### 2. Create a Hugging Face Account
+
+1. Go to https://huggingface.co/
+2. Select **Sign Up** if you do not already have an account.
+3. Verify your email address.
+4. Sign in to your Hugging Face account.
+
+### 3. Request Access to FLUX.1-schnell
+
+`black-forest-labs/FLUX.1-schnell` is a gated Hugging Face model. The app cannot download it until your Hugging Face account has access.
+
+1. Open https://huggingface.co/black-forest-labs/FLUX.1-schnell
+2. Sign in if Hugging Face asks you to.
+3. Read and accept the model license / access terms.
+4. Wait until the page shows that you have access.
+
+If you skip this step, the app will fail with a `401 Unauthorized` or `GatedRepoError`.
+
+### 4. Create a Hugging Face Access Token
+
+1. Open https://huggingface.co/settings/tokens
+2. Select **New token**.
+3. Give it a name, for example:
 
 ```text
-├── app.py                  # Main Python application (Gradio UI + Processing Pipeline)
-├── Dockerfile              # Docker instructions containerizing CUDA/PyTorch environment
-├── docker-compose.yml      # Service architecture config for hardware GPU passthrough
-├── requirements.txt        # Python external dependencies manifest
-└── README.md               # Project documentation
+py-imagen-local
+```
+
+4. Choose a token type that allows reading model files. A read-only token is enough.
+5. Create the token.
+6. Copy the token immediately. It will look similar to:
+
+```text
+hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Keep this token private. Do not paste it into GitHub, chat, screenshots, or commits.
+
+### 5. Create Your Local `.env` File
+
+In PowerShell, copy the example env file:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Open it:
+
+```powershell
+notepad .env
+```
+
+Replace the placeholder token with your real Hugging Face token:
+
+```env
+HF_TOKEN=hf_your_real_token_here
+FLUX_MODEL_ID=black-forest-labs/FLUX.1-schnell
+```
+
+Save and close Notepad.
+
+The `.env` file is ignored by Git so your token does not get committed.
+
+### 6. Build and Start the App
+
+Run:
+
+```powershell
+docker compose up --build
+```
+
+The first run can take a long time because Docker builds the image and downloads the FLUX model files. The model cache is mounted from your host at:
+
+```text
+~/.cache/huggingface
+```
+
+After the model finishes loading, open:
+
+```text
+http://localhost:7860
+```
+
+Generated images are saved locally in:
+
+```text
+D:\Projects\py-imagen\outputs
+```
+
+Because the project folder is mounted into Docker, the container path `/app/outputs` maps back to this Windows folder.
+
+### 7. Generate Locally, Upload, or Post
+
+The app always saves the generated PNG locally first. The two checkboxes control what happens after local save:
+
+- **Auto save to Google Drive**: Uploads the saved PNG to your Google Drive.
+- **Post to social media page**: Schedules the image through the Meta API. This also uploads to Google Drive automatically because Meta needs a reachable image URL.
+
+Leave both unchecked when you only want to test local image generation.
+
+### 8. Run in the Background
+
+After you confirm the app works, you can run it detached:
+
+```powershell
+docker compose up --build -d
+```
+
+View logs:
+
+```powershell
+docker compose logs -f
+```
+
+Stop the app:
+
+```powershell
+docker compose down
+```
+
+Restart after changing `.env`:
+
+```powershell
+docker compose down
+docker compose up --build
+```
+
+## Optional Google Drive Setup
+
+The image-generation UI can run without Google Drive. You only need Google setup when you enable **Auto save to Google Drive** or **Post to social media page**.
+
+1. Create a Google Cloud project.
+2. Enable the Google Drive API.
+3. Create OAuth client credentials for a desktop app.
+4. Download the credentials JSON file.
+5. Rename it to:
+
+```text
+credentials.json
+```
+
+6. Put it in the project root:
+
+```text
+D:\Projects\py-imagen\credentials.json
+```
+
+The first time the app uploads to Drive, it will create `token.json`. Both `credentials.json` and `token.json` are ignored by Git.
+
+## Optional Meta Setup
+
+You only need Meta setup when you enable **Post to social media page**. To schedule posts through Meta, update these values in `app.py`:
+
+```python
+META_ACCESS_TOKEN = "your-meta-page-access-token"
+FACEBOOK_PAGE_ID = "your-facebook-page-id"
+```
+
+You need a valid Meta Graph API page access token with the permissions required to create and schedule photo posts.
+
+## Troubleshooting
+
+### `401 Unauthorized` or `GatedRepoError`
+
+This means Hugging Face authentication is missing or your account has not been approved for the model.
+
+Check:
+
+- You accepted access at https://huggingface.co/black-forest-labs/FLUX.1-schnell
+- `.env` exists in `D:\Projects\py-imagen`
+- `.env` contains a real `HF_TOKEN`
+- You restarted Docker Compose after editing `.env`
+
+### CUDA out of memory
+
+Your 16GB GPU should work with CPU offload, but VRAM can still run out if other apps are using the GPU.
+
+Try:
+
+- Close games, video editors, and extra browser tabs.
+- Generate one image at a time.
+- Reduce image size in `app.py`, for example from `896x1120` to `768x960`.
+- Keep `pipe.enable_model_cpu_offload()` enabled.
+
+### Docker cannot access the GPU
+
+Run:
+
+```powershell
+nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.1.1-runtime-ubuntu22.04 nvidia-smi
+```
+
+If the Docker command fails, check Docker Desktop, WSL2, NVIDIA drivers, and GPU container support.
+
+## Project Structure
+
+```text
+.
+|-- app.py
+|-- Dockerfile
+|-- docker-compose.yml
+|-- requirements.txt
+|-- .env.example
+|-- .gitignore
+|-- outputs/
+`-- README.md
+```
