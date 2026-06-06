@@ -122,7 +122,9 @@ Run:
 docker compose up --build
 ```
 
-The first run can take a long time because Docker builds the image and downloads the FLUX model files. The model is large, so it is stored in a persistent Docker volume instead of inside the container image.
+The first run can take a long time because Docker builds the image. The Gradio page should open before the model is loaded. The FLUX model downloads and loads the first time you click **Generate Image**.
+
+The model is large, so it is stored in a persistent Docker volume instead of inside the container image.
 
 ```text
 huggingface_model_cache
@@ -134,7 +136,7 @@ Inside the container, that volume is mounted at:
 /models/huggingface
 ```
 
-Docker rebuilds and normal `docker compose down` commands keep this volume, so the model should not download again every time you restart.
+Docker rebuilds and normal `docker compose down` commands keep this volume, so the model should not download again every time you restart. The first generation after starting the app can still take a while because the model must be loaded from disk into RAM/VRAM.
 
 After the model finishes loading, open:
 
@@ -280,6 +282,17 @@ Check:
 - You did not run `docker compose down -v`.
 - You did not delete the `py-imagen_huggingface_model_cache` Docker volume.
 - `docker-compose.yml` still mounts `huggingface_model_cache:/models/huggingface`.
+
+### `localhost:7860` does not open
+
+Check that the container is running and that port `7860` is published:
+
+```powershell
+docker compose ps
+docker compose logs -f
+```
+
+The Gradio UI should launch before FLUX loads. If the page is open but the first generation takes a long time, that usually means the model is downloading or loading from the Docker volume.
 
 ## Project Structure
 

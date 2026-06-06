@@ -37,31 +37,41 @@ def has_huggingface_auth():
 # ==========================================
 # LOCAL GPU ENGINE LOADING (FLUX.1-schnell)
 # ==========================================
-if not has_huggingface_auth():
-    raise RuntimeError(
-        "FLUX.1-schnell is a gated Hugging Face model. Request access at "
-        "https://huggingface.co/black-forest-labs/FLUX.1-schnell, create a "
-        "Hugging Face access token, then set HF_TOKEN in your .env file before "
-        "starting Docker Compose."
-    )
+pipe = None
 
-print("Loading FLUX into system RAM... This will take a moment on startup.")
-try:
-    pipe = FluxPipeline.from_pretrained(
-        FLUX_MODEL_ID,
-        torch_dtype=torch.bfloat16,
-        token=get_huggingface_token()
-    )
-except Exception as exc:
-    if "gated repo" in str(exc).lower() or "401" in str(exc):
+
+def get_flux_pipeline():
+    global pipe
+    if pipe is not None:
+        return pipe
+
+    if not has_huggingface_auth():
         raise RuntimeError(
-            f"Unable to download {FLUX_MODEL_ID}. Confirm your Hugging Face "
-            "account has accepted the model terms and that HF_TOKEN is valid "
-            "inside the container."
-        ) from exc
-    raise
-# Offload layers back and forth between 32GB System RAM and 16GB VRAM dynamically
-pipe.enable_model_cpu_offload()
+            "FLUX.1-schnell is a gated Hugging Face model. Request access at "
+            "https://huggingface.co/black-forest-labs/FLUX.1-schnell, create a "
+            "Hugging Face access token, then set HF_TOKEN in your .env file before "
+            "starting Docker Compose."
+        )
+
+    print("Loading FLUX into system RAM... This will take a moment on first generation.")
+    try:
+        pipe = FluxPipeline.from_pretrained(
+            FLUX_MODEL_ID,
+            torch_dtype=torch.bfloat16,
+            token=get_huggingface_token()
+        )
+    except Exception as exc:
+        if "gated repo" in str(exc).lower() or "401" in str(exc):
+            raise RuntimeError(
+                f"Unable to download {FLUX_MODEL_ID}. Confirm your Hugging Face "
+                "account has accepted the model terms and that HF_TOKEN is valid "
+                "inside the container."
+            ) from exc
+        raise
+
+    # Offload layers back and forth between 32GB System RAM and 16GB VRAM dynamically.
+    pipe.enable_model_cpu_offload()
+    return pipe
 
 # ==========================================
 # CORE PROCESSING FUNCTIONS
@@ -134,8 +144,9 @@ def process_pipeline(json_input_str, post_caption, delay_hours, save_to_google_d
             width, height = 896, 1120
 
         # 2. Local GPU Generation
+        flux_pipe = get_flux_pipeline()
         print("Generating background with local GPU VRAM...")
-        generated_img = pipe(
+        generated_img = flux_pipe(
             prompt=req["prompt"],
             height=height,
             width=width,
