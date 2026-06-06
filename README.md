@@ -17,7 +17,7 @@ An automated, self-hosted pipeline that takes text blueprints, generates images 
 | :--- | :--- |
 | GPU | NVIDIA GPU with 16GB VRAM |
 | System RAM | 32GB |
-| Storage | At least 30GB free for model files and Docker layers |
+| Storage | At least 40GB free for model files, Docker layers, and generated images |
 | OS | Windows with Docker Desktop and WSL2 backend |
 
 ## Step-by-Step Local Setup
@@ -122,11 +122,19 @@ Run:
 docker compose up --build
 ```
 
-The first run can take a long time because Docker builds the image and downloads the FLUX model files. The model cache is mounted from your host at:
+The first run can take a long time because Docker builds the image and downloads the FLUX model files. The model is large, so it is stored in a persistent Docker volume instead of inside the container image.
 
 ```text
-~/.cache/huggingface
+huggingface_model_cache
 ```
+
+Inside the container, that volume is mounted at:
+
+```text
+/models/huggingface
+```
+
+Docker rebuilds and normal `docker compose down` commands keep this volume, so the model should not download again every time you restart.
 
 After the model finishes loading, open:
 
@@ -171,11 +179,27 @@ Stop the app:
 docker compose down
 ```
 
+This stops and removes the container, but keeps the downloaded model volume.
+
 Restart after changing `.env`:
 
 ```powershell
 docker compose down
 docker compose up --build
+```
+
+Check the model cache volume:
+
+```powershell
+docker volume ls
+docker volume inspect py-imagen_huggingface_model_cache
+```
+
+Only delete the model cache if you intentionally want to free disk space and are okay downloading FLUX again:
+
+```powershell
+docker compose down
+docker volume rm py-imagen_huggingface_model_cache
 ```
 
 ## Optional Google Drive Setup
@@ -245,6 +269,17 @@ docker run --rm --gpus all nvidia/cuda:12.1.1-runtime-ubuntu22.04 nvidia-smi
 ```
 
 If the Docker command fails, check Docker Desktop, WSL2, NVIDIA drivers, and GPU container support.
+
+### Model downloads again after restart
+
+The model should stay in the Docker volume named `py-imagen_huggingface_model_cache`.
+
+Check:
+
+- You are starting the app from the same project folder.
+- You did not run `docker compose down -v`.
+- You did not delete the `py-imagen_huggingface_model_cache` Docker volume.
+- `docker-compose.yml` still mounts `huggingface_model_cache:/models/huggingface`.
 
 ## Project Structure
 

@@ -3,7 +3,8 @@ FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04
 
 # Set environment variables to prevent Python from writing pyc files & buffering stdout
 ENV PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    HF_HOME=/models/huggingface
 
 # Install system dependencies required for Python, PIL, and Git
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -9,10 +9,12 @@ services:
       - HF_TOKEN=${HF_TOKEN:-}
       - HUGGINGFACE_HUB_TOKEN=${HUGGINGFACE_HUB_TOKEN:-}
       - FLUX_MODEL_ID=${FLUX_MODEL_ID:-black-forest-labs/FLUX.1-schnell}
+      # Keep large Hugging Face model files in a persistent Docker volume.
+      - HF_HOME=/models/huggingface
     volumes:
       - .:/app
-      # Cache Hugging Face models on your host machine so they don't re-download if the container resets
-      - ~/.cache/huggingface:/root/.cache/huggingface
+      # FLUX model files are large, so keep them outside the container/image.
+      - huggingface_model_cache:/models/huggingface
     deploy:
       resources:
         reservations:
@@ -21,3 +23,6 @@ services:
               count: 1
               capabilities: [gpu]
     restart: unless-stopped
+
+volumes:
+  huggingface_model_cache:
